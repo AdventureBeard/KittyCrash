@@ -1,7 +1,17 @@
+/**
+ * Author: Braden Herndon
+ * "Kitty Crash" breakout game for UI Design and Mobile Development class.
+ *
+ * This activity handles all of our title screen assets, such as an animated logo,
+ * start button, and background music.
+ */
+
+
 package com.uidesign.braden.kittycrash;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -25,7 +35,7 @@ import android.widget.ImageView;
  * An example full-screen activity that shows and hides the system UI (i.e.
  * status bar and navigation/system bar) with user interaction.
  */
-public class TitleScreen extends AppCompatActivity {
+public class TitleScreenActivity extends AppCompatActivity {
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -49,33 +59,14 @@ public class TitleScreen extends AppCompatActivity {
     private ImageView mImageView;
     private boolean mVisible;
     private MusicTask mt;
-    private SoundEffectTask sfx;
     private SoundPool sp;
     private ImageButton startButton;
     private ImageButton titleButton;
-
+    private int soundMeow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        mt = new MusicTask(this);
-        mt.execute();
-
-        AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .build();
-
-        sp = new SoundPool.Builder()
-                .setMaxStreams(3)
-                .setAudioAttributes(audioAttributes)
-                .build();
-        final int soundKittyCrash = sp.load(this, R.raw.kittycrash, 1);
-        final int soundMeow = sp.load(this, R.raw.meow, 1);
-
-
-
         setContentView(R.layout.activity_title_screen);
 
         mVisible = true;
@@ -91,27 +82,9 @@ public class TitleScreen extends AppCompatActivity {
             }
         });
 
-        titleButton = (ImageButton) findViewById(R.id.titleButton);
-        titleButton.setBackgroundColor(Color.TRANSPARENT);
-        Animation titleAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.title);
-        titleButton.startAnimation(titleAnimation);
-        startButton = (ImageButton) findViewById(R.id.startButton);
-        startButton.setBackgroundColor(Color.TRANSPARENT);
-        startButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //SoundEffectTask sfx = new SoundEffectTask(getApplicationContext());
-                //sfx.execute();
-                Animation buttonAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.button);
-                startButton.startAnimation(buttonAnimation);
-                startButton.setImageResource(R.drawable.kittymouthopen);
-                sp.play(soundMeow, 1.0f, 1.0f, 1, 0, 1);
-            }
-        });
-
-        // Upon interacting with UI controls, delay any scheduled hide()
-        // operations to prevent the jarring behavior of controls going away
-        // while interacting with the UI.
+        //  Set up custom assets for the title screen.
+        setupAudio();
+        setupTitleUI();
     }
 
     @Override
@@ -123,6 +96,61 @@ public class TitleScreen extends AppCompatActivity {
         // are available.
         delayedHide(100);
     }
+
+    /** setupAudio()
+     * Start the background music and load the necessary sound effects for the title screen.
+     */
+    protected void setupAudio() {
+        // Start the background music
+        mt = new MusicTask(this);
+        mt.execute();
+        // Load the sound effects
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .build();
+        sp = new SoundPool.Builder()
+                .setMaxStreams(3)
+                .setAudioAttributes(audioAttributes)
+                .build();
+        soundMeow = sp.load(this, R.raw.meow, 1);
+    }
+
+    /** setupTitleUI()
+     * Setup title graphics and their respective animations, as well as rig up start button
+     * to start game activity upon touch. The action has a slight delay to allow the button
+     * animation to finish before the activity starts.
+     */
+    protected void setupTitleUI() {
+        // Setup title graphic and animation.
+        titleButton = (ImageButton) findViewById(R.id.titleButton);
+        titleButton.setBackgroundColor(Color.TRANSPARENT);
+        Animation titleAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.title);
+        titleButton.startAnimation(titleAnimation);
+
+        // Setup start button and animation.
+        startButton = (ImageButton) findViewById(R.id.startButton);
+        startButton.setBackgroundColor(Color.TRANSPARENT);
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Animation buttonAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.button);
+                startButton.startAnimation(buttonAnimation);
+                startButton.setImageResource(R.drawable.kittymouthopen);
+                sp.play(soundMeow, 1.0f, 1.0f, 1, 0, 1);
+                Handler h = new Handler();
+                final Runnable startGame = new Runnable() {
+                    public void run() {
+                        Intent intent = new Intent(getApplicationContext(), GameActivity.class);
+                        startActivity(intent);
+                    }
+                };
+                h.postDelayed(startGame, 150);
+            }
+        });
+    }
+
+    /** CODE BELOW AUTOMATICALLY GENERATED BY ANDROID STUDIO **/
 
     /**
      * Touch listener to use for in-layout UI controls to delay hiding the

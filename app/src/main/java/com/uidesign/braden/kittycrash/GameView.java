@@ -24,11 +24,9 @@ import android.widget.RelativeLayout;
 public class GameView extends View implements SensorEventListener {
 
     // SCREEN
-    private int screenWidth;
-    private int screenHeight;
     private float lastTouchX;
-    private float lastTouchY;
     boolean firstRun = true;
+    boolean touchRelease = false;
 
     Handler collisionHandler;
     Runnable collisionCheck;
@@ -49,8 +47,6 @@ public class GameView extends View implements SensorEventListener {
     private int paddleDX;
 
     // Accelerometer-Related Things
-    private boolean ignoreSensor;
-    private Handler ignoreSensorHandler;
     private SensorManager sensorManager;
     private Sensor sensorAccelerometer;
     private Sensor sensorMagfield;
@@ -64,7 +60,6 @@ public class GameView extends View implements SensorEventListener {
     private float[] accelerometerVals = new float[3];
     private float[] magfieldVals = new float[9];
     private float[] results = new float[3];
-    private String text = "OI";
 
     private Paint paint;
 
@@ -76,10 +71,11 @@ public class GameView extends View implements SensorEventListener {
         sensorMagfield = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         sensorManager.registerListener(this, sensorAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, sensorMagfield, SensorManager.SENSOR_DELAY_NORMAL);
-        ignoreSensorHandler = new Handler();
 
         paint = new Paint();
         paint.setTextSize(30);
+
+        paddle = new Rect();
 
         dx = ballSpeed;
         dy = ballSpeed;
@@ -113,28 +109,29 @@ public class GameView extends View implements SensorEventListener {
             firstRun = false;
         }
 
-        if (paddleX + 150 < lastTouchX) {
+
+        if (touchRelease) {
+            paddleDX = 0;
+        } else if (paddle.centerX() < lastTouchX && paddle.right < getWidth()) {
             paddleDX = 20;
-        } else if (paddleX + 150 > lastTouchX) {
+        } else if (paddle.centerX() > lastTouchX && paddle.left > 0) {
             paddleDX = -20;
         } else {
             paddleDX = 0;
         }
 
+
         int newPaddleX = paddleX + paddleDX;
         paddleX = newPaddleX;
 
-        Rect rect = new Rect();
-        rect.set(paddleX, paddleY, paddleX + 300, paddleY + 60);
+        paddle.set(paddleX, paddleY, paddleX + 300, paddleY + 60);
         paint.setColor(Color.GREEN);
-        canvas.drawRect(rect, paint);
+        canvas.drawRect(paddle, paint);
     }
 
     protected void drawBall(Canvas canvas) {
         // FIXME: 11/28/15  - Fix edge sticking
         int accelX = (int) Math.round(roll * rollStrength);
-
-
         if (x < 0 || y < 0 || (x == 0 && y == 0)) {
             x = canvas.getWidth() / 2;
             y = canvas.getHeight() / 2;
@@ -164,22 +161,18 @@ public class GameView extends View implements SensorEventListener {
         canvas.drawText("Ball DY: " + dy, 50, 320, paint);
         canvas.drawText("Paddle DX: " + paddleDX, 50, 360, paint);
         canvas.drawText("Block Collision: " + blockCollision, 50, 400, paint);
-        canvas.drawText("Ignore Sensor: " + ignoreSensor, 50, 440, paint);
 
     }
 
     private void checkCollisions() {
-        if ((x > paddleX - ballRadius && x < paddleX + 300 + ballRadius) &&
-                ((y > paddleY - ballRadius && y < paddleY + 60 + ballRadius))) {
-            blockCollision = true;
-        } else {
-            blockCollision = false;
-        }
+        blockCollision = (x > paddleX - ballRadius && x < paddleX + 300 + ballRadius) &&
+                ((y > paddleY - ballRadius && y < paddleY + 60 + ballRadius));
 //        collisionHandler.postDelayed(collisionCheck, 10);
     }
 
-    /** onSensorChanged(SensorEvent event)
-     *
+    /**
+     * onSensorChanged(SensorEvent event)
+     * <p/>
      * Updates the known roll of the device.
      * I didn't figure out this chain of fxn calls on my own. Much of this came from
      * the page from which the lowpass filter given in class was taken.
@@ -189,7 +182,13 @@ public class GameView extends View implements SensorEventListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        lastTouchX = event.getX();
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            touchRelease = false;
+            lastTouchX = event.getX();
+        } else if (event.getAction() == MotionEvent.ACTION_UP){
+            touchRelease = true;
+        }
+
         return true;
     }
 
@@ -224,10 +223,10 @@ public class GameView extends View implements SensorEventListener {
             // We need to know if the phone is rotated. If so, we need to tell
             // our sensors that our coordinate system is 90 degrees difference.
             if (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) {
-                SensorManager.remapCoordinateSystem(rotationMatrix,SensorManager.AXIS_X,
+                SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_X,
                         SensorManager.AXIS_MINUS_Z, computedRotationMatrix);
             } else {
-                SensorManager.remapCoordinateSystem(rotationMatrix,SensorManager.AXIS_Y,
+                SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_Y,
                         SensorManager.AXIS_MINUS_Z, computedRotationMatrix);
             }
 
@@ -235,22 +234,15 @@ public class GameView extends View implements SensorEventListener {
             // The getOrientation function returns roll, pitch, and yaw based on the
             // rotation matrix given. The value is in radians so we convert it to degrees.
             roll = (float) (((results[1] * 180 / Math.PI)));
-            text = roll + "";
         }
-
-
     }
 
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-    }
-
-    /** lpFilter(float[] input, float[] output)
+    /**
+     * lpFilter(float[] input, float[] output)
      * The lowpass filter given to us in class.
      *
-     * @param input     the input float matrix
-     * @param output    the resulting, filtered matrix
+     * @param input  the input float matrix
+     * @param output the resulting, filtered matrix
      * @return
      */
     protected float[] lpFilter(float[] input, float[] output) {
@@ -262,5 +254,11 @@ public class GameView extends View implements SensorEventListener {
             output[i] = output[i] + ALPHA * (input[i] - output[i]);
         }
         return output;
+    }
+
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
     }
 }

@@ -1,52 +1,48 @@
 package com.uidesign.braden.kittycrash;
 
 import android.graphics.Color;
+import android.os.Handler;
+
+import javax.net.ssl.HandshakeCompletedListener;
 
 /**
  * Created by braden on 11/29/15.
  */
 public class Block {
 
-    public int xPos;
-    int yPos;
-    int width;
-    int height;
-    int layer;
-    int hitpoints;
+    private int hitpoints;
     int color;
+    boolean invincible;
 
-    public Block(int xPos, int layer, int width, int hitpoints) {
-        this.xPos = xPos;
-        this.layer = layer;
-        this.width = 80;
+    public int top, left, bottom, right;
+
+    public Block(int position, int layer, int hitpoints, int screenX, int screenY) {
+        left = position * (screenX / 9) + 30;
+        top = layer * (screenY / 16);
+        right = left + (screenX / 9) - 30;
+        bottom = top  + (screenY / 32);
+//        left = screenX / 2;
+//        top = screenY / 2;
+//        right = left + 200;
+//        bottom = top + 100;
         this.hitpoints = hitpoints;
         setColor(hitpoints);
-
     }
 
-    public int getWidth() {
-        return width;
-    }
-
-    public void setWidth(int width) {
-        this.width = width;
-    }
-
-    public int getLayer() {
-        return layer;
-    }
-
-    public void setLayer(int layer) {
-        this.layer = layer;
-    }
-
-    public void decreaseHitpoints() {
-        hitpoints--;
-        setColor(hitpoints);
-    }
-
-    public void setHitpoints(int hitpoints) {
-        this.hitpoints = hitpoints;
+    private void decreaseHitpoints() {
+        if (!invincible) {
+            this.hitpoints--;
+            invincible = true;
+            setColor(hitpoints);
+            Handler blockCooldownHandler = new Handler();
+            Runnable blockCooldown = new Runnable() {
+                @Override
+                public void run() {
+                    invincible = false;
+                }
+            };
+            blockCooldownHandler.postDelayed(blockCooldown, 500);
+        }
     }
 
     public int getHitpoints() {
@@ -57,7 +53,7 @@ public class Block {
         return color;
     }
 
-    public void setColor(int hp) {
+    private void setColor(int hp) {
         switch (hp) {
             case 1:
                 color = Color.WHITE;
@@ -73,6 +69,17 @@ public class Block {
                 break;
             case 5:
                 color = Color.BLACK;
+        }
+    }
+
+    public boolean collision(int ballX, int ballY, int ballRadius) {
+        if (hitpoints == 0) return false;
+        if (((ballX > (this.left - ballRadius)) && (ballX < (this.right + ballRadius))) &&
+                (ballY > (this.top - ballRadius)) && (ballY < (this.bottom + ballRadius))) {
+            decreaseHitpoints();
+            return true;
+        } else {
+            return false;
         }
     }
 }

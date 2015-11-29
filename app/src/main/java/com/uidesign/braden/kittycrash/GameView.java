@@ -15,8 +15,11 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
 import android.hardware.SensorEventListener;
+import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
+
+import java.util.ArrayList;
 
 /**
  * Created by braden on 11/28/15.
@@ -24,12 +27,10 @@ import android.widget.RelativeLayout;
 public class GameView extends View implements SensorEventListener {
 
     // SCREEN
+    int screenWidth, screenHeight;
     private float lastTouchX;
     boolean firstRun = true;
     boolean touchRelease = false;
-
-    Handler collisionHandler;
-    Runnable collisionCheck;
 
     // BALL
     private int x;
@@ -38,13 +39,21 @@ public class GameView extends View implements SensorEventListener {
     private int dy = 20;
     private int ballRadius = 50;
     private final int ballSpeed = 20;
+    private boolean paddleCollision = false;
     private boolean blockCollision = false;
+    private boolean horizontalCollision = false;
+    private boolean verticalCollision = false;
 
     // PADDLE
     private Rect paddle;
     private int paddleX = 0;
     private int paddleY = 0;
     private int paddleDX;
+
+
+    // LEVEL
+    LevelManager levelManager;
+    ArrayList<Block> levelState;
 
     // Accelerometer-Related Things
     private SensorManager sensorManager;
@@ -79,15 +88,21 @@ public class GameView extends View implements SensorEventListener {
 
         dx = ballSpeed;
         dy = ballSpeed;
-//
-//        collisionHandler = new Handler();
-//        collisionCheck = new Runnable() {
-//            @Override
-//            public void run() {
-//               checkCollisions();
-//            }
-//        };
-//        collisionHandler.postDelayed(collisionCheck, 100);
+
+
+        ViewTreeObserver viewTreeObserver = getViewTreeObserver();
+        if (viewTreeObserver.isAlive()) {
+            viewTreeObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    screenWidth = getWidth();
+                    screenHeight = getHeight();
+                    levelManager = new LevelManager(screenWidth, screenHeight);
+                    levelState = levelManager.getCurrentLevel();
+                }
+            });
+        }
     }
 
     @Override
@@ -99,28 +114,26 @@ public class GameView extends View implements SensorEventListener {
         canvas.drawPaint(paint);
         drawPaddle(canvas);
         drawBall(canvas);
+        drawLevel(canvas);
         invalidate();
     }
 
     private void drawPaddle(Canvas canvas) {
         if (firstRun) {
-            paddleX = getWidth() / 2 - 300;
-            paddleY = 9 * getHeight() / 10;
+            paddleX = screenWidth / 2 - 300;
+            paddleY = 9 * screenHeight / 10;
             firstRun = false;
         }
 
-
         if (touchRelease) {
             paddleDX = 0;
-        } else if (paddle.centerX() < lastTouchX && paddle.right < getWidth()) {
+        } else if (paddle.centerX() < lastTouchX && paddle.right < screenWidth) {
             paddleDX = 20;
         } else if (paddle.centerX() > lastTouchX && paddle.left > 0) {
             paddleDX = -20;
         } else {
             paddleDX = 0;
         }
-
-
         int newPaddleX = paddleX + paddleDX;
         paddleX = newPaddleX;
 
@@ -139,13 +152,18 @@ public class GameView extends View implements SensorEventListener {
         int newX = x + dx + accelX;
         int newY = y + dy;
 
-        if (blockCollision) {
+        if (newX >= screenWidth - ballRadius) {
+            dx *= -1;
+            x += -10;
+        } else if (newX <= ballRadius) {
+            dx *= -1;
+            x += 10;
+        } else if (newY >= screenHeight - ballRadius) {
             dy *= -1;
-            y = y - (paddleY - y);
-        } else if (newX >= canvas.getWidth() - ballRadius || newX <= ballRadius) {
-            dx = dx * -1;
-        } else if (newY >= canvas.getHeight() - ballRadius || newY <= 0 + ballRadius) {
-            dy = dy * -1;
+            y += -10;
+        } else if (newY <= ballRadius) {
+            dy *= -1;
+            y += 10;
         } else {
             x = newX;
             y = newY;
@@ -160,14 +178,41 @@ public class GameView extends View implements SensorEventListener {
         canvas.drawText("Ball DX: " + dx, 50, 280, paint);
         canvas.drawText("Ball DY: " + dy, 50, 320, paint);
         canvas.drawText("Paddle DX: " + paddleDX, 50, 360, paint);
-        canvas.drawText("Block Collision: " + blockCollision, 50, 400, paint);
 
     }
 
+
+    private void drawLevel(Canvas canvas) {
+        if (levelState != null) {
+            for (int i = 0; i < levelState.size(); i++) {
+                drawBlock(levelState.get(i), canvas);
+            }
+        }
+    }
+
+    private void drawBlock(Block block, Canvas canvas) {
+        if (block == null || block.getHitpoints() == 0) return;
+        Rect rect = new Rect();
+        rect.set(block.left, block.top, block.right, block.bottom);
+        paint.setColor(block.getColor());
+        canvas.drawRect(rect, paint);
+    }
+
     private void checkCollisions() {
-        blockCollision = (x > paddleX - ballRadius && x < paddleX + 300 + ballRadius) &&
+        paddleCollision = (x > paddleX - ballRadius && x < paddleX + 300 + ballRadius) &&
                 ((y > paddleY - ballRadius && y < paddleY + 60 + ballRadius));
-//        collisionHandler.postDelayed(collisionCheck, 10);
+        if (paddleCollision) {
+            dy *= -1;
+            y = y - (paddleY - y);
+        } else {
+            for (int i = 0; i < levelState.size(); i++) {
+                if (levelState.get(i).collision(x, y, ballRadius)) {
+                    dy *= -1;
+                    y += 10;
+                }
+
+            }
+        }
     }
 
     /**
@@ -185,7 +230,7 @@ public class GameView extends View implements SensorEventListener {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             touchRelease = false;
             lastTouchX = event.getX();
-        } else if (event.getAction() == MotionEvent.ACTION_UP){
+        } else if (event.getAction() == MotionEvent.ACTION_UP) {
             touchRelease = true;
         }
 

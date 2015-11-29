@@ -2,6 +2,8 @@ package com.uidesign.braden.kittycrash;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -31,6 +33,7 @@ public class GameView extends View implements SensorEventListener {
     private float lastTouchX;
     boolean firstRun = true;
     boolean touchRelease = false;
+    int playerScore = 0;
 
     // BALL
     private int x;
@@ -39,10 +42,8 @@ public class GameView extends View implements SensorEventListener {
     private int dy = 20;
     private int ballRadius = 50;
     private final int ballSpeed = 20;
+    private int speedMultiplier = 1;
     private boolean paddleCollision = false;
-    private boolean blockCollision = false;
-    private boolean horizontalCollision = false;
-    private boolean verticalCollision = false;
 
     // PADDLE
     private Rect paddle;
@@ -82,7 +83,7 @@ public class GameView extends View implements SensorEventListener {
         sensorManager.registerListener(this, sensorMagfield, SensorManager.SENSOR_DELAY_NORMAL);
 
         paint = new Paint();
-        paint.setTextSize(30);
+        paint.setTextSize(80);
 
         paddle = new Rect();
 
@@ -109,13 +110,19 @@ public class GameView extends View implements SensorEventListener {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         checkCollisions();
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.parseColor("#9FB6CD"));
-        canvas.drawPaint(paint);
+        drawBackground(canvas);
         drawPaddle(canvas);
         drawBall(canvas);
         drawLevel(canvas);
         invalidate();
+    }
+
+    private void drawBackground(Canvas canvas) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.parseColor("#9FB6CD"));
+        canvas.drawPaint(paint);
+        paint.setColor(Color.WHITE);
+        canvas.drawText("Score: " + playerScore, 5 * screenWidth/8, 120, paint);
     }
 
     private void drawPaddle(Canvas canvas) {
@@ -138,7 +145,7 @@ public class GameView extends View implements SensorEventListener {
         paddleX = newPaddleX;
 
         paddle.set(paddleX, paddleY, paddleX + 300, paddleY + 60);
-        paint.setColor(Color.GREEN);
+        paint.setColor(Color.parseColor("#b82c4d"));
         canvas.drawRect(paddle, paint);
     }
 
@@ -170,14 +177,6 @@ public class GameView extends View implements SensorEventListener {
         }
         paint.setColor(Color.WHITE);
         canvas.drawCircle(x, y, ballRadius, paint);
-        canvas.drawText("" + accelX, 50, 50, paint);
-        canvas.drawText("Last Touched: " + lastTouchX, 50, 120, paint);
-        canvas.drawText("Paddle X: " + paddleX, 50, 160, paint);
-        canvas.drawText("Ball X: " + x, 50, 200, paint);
-        canvas.drawText("Ball Y: " + y, 50, 240, paint);
-        canvas.drawText("Ball DX: " + dx, 50, 280, paint);
-        canvas.drawText("Ball DY: " + dy, 50, 320, paint);
-        canvas.drawText("Paddle DX: " + paddleDX, 50, 360, paint);
 
     }
 
@@ -192,10 +191,8 @@ public class GameView extends View implements SensorEventListener {
 
     private void drawBlock(Block block, Canvas canvas) {
         if (block == null || block.getHitpoints() == 0) return;
-        Rect rect = new Rect();
-        rect.set(block.left, block.top, block.right, block.bottom);
         paint.setColor(block.getColor());
-        canvas.drawRect(rect, paint);
+        canvas.drawRect(block.getRectangle(), paint);
     }
 
     private void checkCollisions() {
@@ -206,11 +203,30 @@ public class GameView extends View implements SensorEventListener {
             y = y - (paddleY - y);
         } else {
             for (int i = 0; i < levelState.size(); i++) {
-                if (levelState.get(i).collision(x, y, ballRadius)) {
-                    dy *= -1;
-                    y += 10;
+                switch (levelState.get(i).collision(x, y, ballRadius)) {
+                    case 0:
+                        break;
+                    case 1: // TOP COLLISION
+                        dy *= -1;
+                        y += -10;
+                        playerScore += 10 * speedMultiplier;
+                        return;
+                    case 2: // LEFT COLLISION
+                        dx *= -1;
+                        x += -10;
+                        playerScore += 10 * speedMultiplier;
+                        return;
+                    case 3: // BOTTOM COLLISION
+                        dy *= -1;
+                        y += 10;
+                        playerScore += 10 * speedMultiplier;
+                        return;
+                    case 4: // RIGHT COLLISION
+                        dx *= -1;
+                        x += 10;
+                        playerScore += 10 * speedMultiplier;
+                        return;
                 }
-
             }
         }
     }

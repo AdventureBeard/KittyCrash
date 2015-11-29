@@ -5,39 +5,57 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorManager;
 import android.os.Handler;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
 import android.hardware.SensorEventListener;
+import android.widget.FrameLayout;
+import android.widget.RelativeLayout;
 
 /**
  * Created by braden on 11/28/15.
  */
-public class GameView extends View implements SensorEventListener{
+public class GameView extends View implements SensorEventListener {
 
-    int x;
-    int dx = 20;
+    // SCREEN
+    private int screenWidth;
+    private int screenHeight;
+    private float lastTouchX;
+    private float lastTouchY;
+    boolean firstRun = true;
 
-    int y;
-    int dy = 20;
+    Handler collisionHandler;
+    Runnable collisionCheck;
 
-    int ballRadius = 50;
-    int dRadius = 3;
+    // BALL
+    private int x;
+    private int dx = 20;
+    private int y;
+    private int dy = 20;
+    private int ballRadius = 50;
+    private final int ballSpeed = 20;
+    private boolean blockCollision = false;
 
-
-    // BALL MOVEMENT
-    final int ballSpeed = 20;
-    String text = "OI";
+    // PADDLE
+    private Rect paddle;
+    private int paddleX = 0;
+    private int paddleY = 0;
+    private int paddleDX;
 
     // Accelerometer-Related Things
-    SensorManager sensorManager;
-    Sensor sensorAccelerometer;
-    Sensor sensorMagfield;
-    float roll = 0;
-    final int rollStrength = 1;             // Accelerometer roll influence on ball
+    private boolean ignoreSensor;
+    private Handler ignoreSensorHandler;
+    private SensorManager sensorManager;
+    private Sensor sensorAccelerometer;
+    private Sensor sensorMagfield;
+    private float roll = 0;
+    private final int rollStrength = 1;             // Accelerometer roll influence on ball
     private float[] rotationMatrix = new float[9];
     private float[] inclinationMatrix = new float[9];
     private float[] computedRotationMatrix = new float[9];
@@ -46,9 +64,9 @@ public class GameView extends View implements SensorEventListener{
     private float[] accelerometerVals = new float[3];
     private float[] magfieldVals = new float[9];
     private float[] results = new float[3];
+    private String text = "OI";
 
-    Paint paint;
-
+    private Paint paint;
 
     public GameView(Context ctx) {
         super(ctx);
@@ -58,54 +76,122 @@ public class GameView extends View implements SensorEventListener{
         sensorMagfield = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         sensorManager.registerListener(this, sensorAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, sensorMagfield, SensorManager.SENSOR_DELAY_NORMAL);
+        ignoreSensorHandler = new Handler();
 
         paint = new Paint();
         paint.setTextSize(30);
 
-        x = getWidth()/ 2;
-        y = getHeight()/2;
         dx = ballSpeed;
         dy = ballSpeed;
+//
+//        collisionHandler = new Handler();
+//        collisionCheck = new Runnable() {
+//            @Override
+//            public void run() {
+//               checkCollisions();
+//            }
+//        };
+//        collisionHandler.postDelayed(collisionCheck, 100);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        checkCollisions();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.parseColor("#9FB6CD"));
+        canvas.drawPaint(paint);
+        drawPaddle(canvas);
+        drawBall(canvas);
+        invalidate();
+    }
 
+    private void drawPaddle(Canvas canvas) {
+        if (firstRun) {
+            paddleX = getWidth() / 2 - 300;
+            paddleY = 9 * getHeight() / 10;
+            firstRun = false;
+        }
+
+        if (paddleX + 150 < lastTouchX) {
+            paddleDX = 20;
+        } else if (paddleX + 150 > lastTouchX) {
+            paddleDX = -20;
+        } else {
+            paddleDX = 0;
+        }
+
+        int newPaddleX = paddleX + paddleDX;
+        paddleX = newPaddleX;
+
+        Rect rect = new Rect();
+        rect.set(paddleX, paddleY, paddleX + 300, paddleY + 60);
+        paint.setColor(Color.GREEN);
+        canvas.drawRect(rect, paint);
+    }
+
+    protected void drawBall(Canvas canvas) {
+        // FIXME: 11/28/15  - Fix edge sticking
         int accelX = (int) Math.round(roll * rollStrength);
+
 
         if (x < 0 || y < 0 || (x == 0 && y == 0)) {
             x = canvas.getWidth() / 2;
             y = canvas.getHeight() / 2;
         }
+        int newX = x + dx + accelX;
+        int newY = y + dy;
 
-        if (x + dx + accelX > canvas.getWidth() - ballRadius || x + dx + accelX <= 0 + ballRadius) {
+        if (blockCollision) {
+            dy *= -1;
+            y = y - (paddleY - y);
+        } else if (newX >= canvas.getWidth() - ballRadius || newX <= ballRadius) {
             dx = dx * -1;
-        } else if (y + dy > canvas.getHeight() - ballRadius || y + dy <= 0 + ballRadius) {
+        } else if (newY >= canvas.getHeight() - ballRadius || newY <= 0 + ballRadius) {
             dy = dy * -1;
         } else {
-            x = x + dx + accelX;
-            y = y + dy;
+            x = newX;
+            y = newY;
         }
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.parseColor("#9FB6CD"));
-        canvas.drawPaint(paint);
         paint.setColor(Color.WHITE);
         canvas.drawCircle(x, y, ballRadius, paint);
-        canvas.drawText(text, 50, 50, paint);
-        invalidate();
+        canvas.drawText("" + accelX, 50, 50, paint);
+        canvas.drawText("Last Touched: " + lastTouchX, 50, 120, paint);
+        canvas.drawText("Paddle X: " + paddleX, 50, 160, paint);
+        canvas.drawText("Ball X: " + x, 50, 200, paint);
+        canvas.drawText("Ball Y: " + y, 50, 240, paint);
+        canvas.drawText("Ball DX: " + dx, 50, 280, paint);
+        canvas.drawText("Ball DY: " + dy, 50, 320, paint);
+        canvas.drawText("Paddle DX: " + paddleDX, 50, 360, paint);
+        canvas.drawText("Block Collision: " + blockCollision, 50, 400, paint);
+        canvas.drawText("Ignore Sensor: " + ignoreSensor, 50, 440, paint);
+
+    }
+
+    private void checkCollisions() {
+        if ((x > paddleX - ballRadius && x < paddleX + 300 + ballRadius) &&
+                ((y > paddleY - ballRadius && y < paddleY + 60 + ballRadius))) {
+            blockCollision = true;
+        } else {
+            blockCollision = false;
+        }
+//        collisionHandler.postDelayed(collisionCheck, 10);
     }
 
     /** onSensorChanged(SensorEvent event)
      *
      * Updates the known roll of the device.
-     *
-     * I didn't do this math on my own! This is difficult stuff. Much of this came from
+     * I didn't figure out this chain of fxn calls on my own. Much of this came from
      * the page from which the lowpass filter given in class was taken.
      *
      * @param event
      */
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        lastTouchX = event.getX();
+        return true;
+    }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
@@ -129,9 +215,7 @@ public class GameView extends View implements SensorEventListener{
          The "orientation sensor" has since been deprecated, with online resources
          indicating that calculating phone orientation from both the acceleration and
          magnetic field sensors is the best method.
-
          */
-
         if (magfieldVals != null && accelerometerVals != null) {
             SensorManager.getRotationMatrix(rotationMatrix, inclinationMatrix,
                     accelerometerVals, magfieldVals);
@@ -174,7 +258,6 @@ public class GameView extends View implements SensorEventListener{
         if (output == null) {
             return input;
         }
-
         for (int i = 0; i < input.length; i++) {
             output[i] = output[i] + ALPHA * (input[i] - output[i]);
         }

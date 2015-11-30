@@ -143,6 +143,8 @@ public class TitleScreenActivity extends AppCompatActivity {
                     public void run() {
                         Intent intent = new Intent(getApplicationContext(), GameActivity.class);
                         startActivity(intent);
+//                        Intent intent = new Intent(getApplicationContext(), ScoreboardActivity.class);
+//                        startActivity(intent);
                     }
                 };
                 h.postDelayed(startGame, 150);

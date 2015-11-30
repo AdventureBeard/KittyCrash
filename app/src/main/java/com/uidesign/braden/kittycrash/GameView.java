@@ -1,6 +1,7 @@
 package com.uidesign.braden.kittycrash;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -122,7 +123,7 @@ public class GameView extends View implements SensorEventListener {
         paint.setColor(Color.parseColor("#9FB6CD"));
         canvas.drawPaint(paint);
         paint.setColor(Color.WHITE);
-        canvas.drawText("Score: " + playerScore, 5 * screenWidth/8, 120, paint);
+        canvas.drawText("Score: " + playerScore, 5 * screenWidth / 8, 120, paint);
     }
 
     private void drawPaddle(Canvas canvas) {
@@ -166,8 +167,7 @@ public class GameView extends View implements SensorEventListener {
             dx *= -1;
             x += 10;
         } else if (newY >= screenHeight - ballRadius) {
-            dy *= -1;
-            y += -10;
+            gameOver();
         } else if (newY <= ballRadius) {
             dy *= -1;
             y += 10;
@@ -229,6 +229,13 @@ public class GameView extends View implements SensorEventListener {
                 }
             }
         }
+    }
+
+    private void gameOver() {
+        Context ctx = this.getContext();
+        Intent intent = new Intent(ctx, ScoreboardActivity.class);
+        intent.putExtra("playerScore", playerScore);
+        ctx.startActivity(intent);
     }
 
     /**

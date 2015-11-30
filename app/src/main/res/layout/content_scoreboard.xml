@@ -10,4 +10,30 @@
     tools:showIn="@layout/activity_scoreboard"
     tools:context="com.uidesign.braden.kittycrash.ScoreboardActivity">
 
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true">
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal">
+
+            <ListView
+                android:layout_width="178dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/nameList"
+                android:choiceMode="none" />
+
+            <ListView
+                android:layout_width="181dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/scoreList"
+                android:choiceMode="none" />
+        </LinearLayout>
+    </LinearLayout>
 </RelativeLayout>
